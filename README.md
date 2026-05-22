@@ -33,6 +33,10 @@ recordings folder, and configure quality, segment length, retention, camera,
 microphone, and launch-at-login. macOS will prompt for camera and microphone
 permission on first record.
 
+**Show Mirror** opens a live, horizontally-flipped camera preview so you can
+use it like an actual mirror to check your appearance. The green camera light
+stays on while the preview window is open.
+
 ### Headless (record at login, no UI)
 
 To run the recorder as a background service that starts at login:

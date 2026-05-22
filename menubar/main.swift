@@ -71,13 +71,34 @@ func audioDevices() -> [String] {
         mediaType: .audio, position: .unspecified).devices.map { $0.localizedName }
 }
 
+// ─────────────────────────── Mirror view ───────────────────────────
+// Hosts a live, horizontally-flipped camera preview so you can use Mirror
+// like an actual mirror to check your appearance.
+final class MirrorView: NSView {
+    let preview = AVCaptureVideoPreviewLayer()
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.cgColor
+        preview.videoGravity = .resizeAspectFill
+        layer?.addSublayer(preview)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func layout() {
+        super.layout()
+        preview.frame = bounds
+    }
+}
+
 // ─────────────────────────── App Delegate ──────────────────────────
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
     var statusItem: NSStatusItem!
     var process: Process?
     var startedAt: Date?
     var ticker: Timer?
     weak var elapsedItem: NSMenuItem?
+    var previewWindow: NSWindow?
+    var previewSession: AVCaptureSession?
 
     var isRecording: Bool { process != nil }
 
@@ -159,6 +180,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toggle.image = NSImage(systemSymbolName: isRecording ? "stop.fill" : "record.circle",
                                accessibilityDescription: nil)
         menu.addItem(toggle)
+
+        let mirror = NSMenuItem(title: "Show Mirror",
+                                action: #selector(showMirror), keyEquivalent: "m")
+        mirror.target = self
+        mirror.image = NSImage(systemSymbolName: "person.crop.rectangle",
+                               accessibilityDescription: nil)
+        menu.addItem(mirror)
 
         let open = NSMenuItem(title: "Open Recordings Folder",
                               action: #selector(openFolder), keyEquivalent: "o")
@@ -316,6 +344,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func stopTicker() { ticker?.invalidate(); ticker = nil; startedAt = nil }
+
+    // MARK: Live mirror preview
+    func deviceForConfiguredCamera() -> AVCaptureDevice? {
+        var types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
+        if #available(macOS 14.0, *) { types += [.external, .continuityCamera] }
+        let devs = AVCaptureDevice.DiscoverySession(deviceTypes: types,
+            mediaType: .video, position: .unspecified).devices
+        return devs.first { $0.localizedName == cfgCamera() } ?? devs.first
+    }
+
+    @objc func showMirror() {
+        if let w = previewWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            openMirror()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] ok in
+                DispatchQueue.main.async { if ok { self?.openMirror() } }
+            }
+        default:
+            let a = NSAlert()
+            a.messageText = "Camera access is off"
+            a.informativeText = "Enable camera access for Mirror in System Settings → Privacy & Security → Camera."
+            a.runModal()
+        }
+    }
+
+    func openMirror() {
+        guard let device = deviceForConfiguredCamera(),
+              let input = try? AVCaptureDeviceInput(device: device) else {
+            let a = NSAlert()
+            a.messageText = "Couldn't open the camera"
+            a.informativeText = "The selected camera may be unavailable. Pick a different camera in Settings."
+            a.runModal()
+            return
+        }
+        let session = AVCaptureSession()
+        session.sessionPreset = .high
+        if session.canAddInput(input) { session.addInput(input) }
+
+        let view = MirrorView(frame: NSRect(x: 0, y: 0, width: 480, height: 360))
+        view.preview.session = session
+        if let conn = view.preview.connection {
+            conn.automaticallyAdjustsVideoMirroring = false
+            conn.isVideoMirrored = true          // flip like a real mirror
+        }
+
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
+                         styleMask: [.titled, .closable, .resizable, .miniaturizable],
+                         backing: .buffered, defer: false)
+        w.title = "Mirror"
+        w.contentView = view
+        w.contentAspectRatio = NSSize(width: 4, height: 3)
+        w.center()
+        w.isReleasedWhenClosed = false
+        w.delegate = self
+        previewWindow = w
+        previewSession = session
+
+        NSApp.activate(ignoringOtherApps: true)
+        w.makeKeyAndOrderFront(nil)
+        DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard (notification.object as? NSWindow) === previewWindow else { return }
+        previewSession?.stopRunning()
+        previewSession = nil
+        previewWindow = nil
+    }
 
     // MARK: Folder + stats
     @objc func openFolder() {
