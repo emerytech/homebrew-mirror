@@ -1,0 +1,13 @@
+# Build artifacts
+menubar/Mirror.app/
+menubar/makeicon
+menubar/AppIcon.icns
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Editor / local config
+.claude/
