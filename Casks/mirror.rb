@@ -7,6 +7,7 @@ cask "mirror" do
   desc "Continuous security-camera recorder with live mirror preview"
   homepage "https://github.com/emerytech/homebrew-mirror"
 
+  depends_on :macos
   depends_on formula: "ffmpeg"
 
   app "Mirror.app"
