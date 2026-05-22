@@ -32,6 +32,7 @@ enum K {
     static let audio     = "audioEnabled"
     static let camera    = "videoDevice"
     static let mic       = "audioDevice"
+    static let maxGB     = "maxFolderGB"
 }
 
 let qualities: [(name: String, bitrate: String)] = [
@@ -45,6 +46,11 @@ let segments: [(name: String, secs: Int)] = [
 let retentions: [(name: String, days: Int)] = [
     ("1 day", 1), ("3 days", 3), ("7 days", 7), ("14 days", 14), ("Keep everything", 3650),
 ]
+// Max folder size in GB; 0 = no limit. Oldest clips are deleted past the cap.
+let maxSizes: [(name: String, gb: Int)] = [
+    ("No limit", 0), ("1 GB", 1), ("5 GB", 5), ("10 GB", 10),
+    ("25 GB", 25), ("50 GB", 50), ("100 GB", 100),
+]
 
 let d = UserDefaults.standard
 
@@ -55,6 +61,7 @@ func cfgRetention() -> Int    { let v = d.integer(forKey: K.retention); return v
 func cfgAudio() -> Bool       { d.object(forKey: K.audio) == nil ? true : d.bool(forKey: K.audio) }
 func cfgCamera() -> String    { d.string(forKey: K.camera) ?? "FaceTime HD Camera" }
 func cfgMic() -> String       { d.string(forKey: K.mic) ?? "MacBook Pro Microphone" }
+func cfgMaxGB() -> Int        { d.integer(forKey: K.maxGB) }   // 0 (default) = no limit
 
 // ──────────────────────────── Devices ──────────────────────────────
 func videoDevices() -> [String] {
@@ -283,6 +290,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         m.addItem(.separator())
 
+        section("Max Folder Size")
+        for s in maxSizes {
+            let i = NSMenuItem(title: s.name, action: #selector(selectMaxSize(_:)), keyEquivalent: "")
+            i.target = self; i.representedObject = s.gb
+            i.state = (s.gb == cfgMaxGB()) ? .on : .off
+            m.addItem(i)
+        }
+        m.addItem(.separator())
+
         let audio = NSMenuItem(title: "Record Audio", action: #selector(toggleAudio), keyEquivalent: "")
         audio.target = self; audio.state = cfgAudio() ? .on : .off
         m.addItem(audio)
@@ -321,6 +337,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc func selectRetention(_ s: NSMenuItem) { d.set(s.representedObject as! Int, forKey: K.retention); applyChange() }
     @objc func selectCamera(_ s: NSMenuItem)    { d.set(s.representedObject as! String, forKey: K.camera); applyChange() }
     @objc func selectMic(_ s: NSMenuItem)       { d.set(s.representedObject as! String, forKey: K.mic); applyChange() }
+    @objc func selectMaxSize(_ s: NSMenuItem)   { d.set(s.representedObject as! Int, forKey: K.maxGB); applyChange() }
     @objc func toggleAudio()                    { d.set(!cfgAudio(), forKey: K.audio); applyChange() }
 
     // MARK: Recording control
@@ -335,6 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         env["MIRROR_BITRATE"]        = cfgBitrate()
         env["MIRROR_SEGMENT"]        = String(cfgSegment())
         env["MIRROR_RETENTION_DAYS"] = String(cfgRetention())
+        env["MIRROR_MAX_GB"]         = String(cfgMaxGB())
         env["MIRROR_VIDEO"]          = cfgCamera()
         env["MIRROR_AUDIO"]          = cfgAudio() ? cfgMic() : ""
         env["MIRROR_PID"]            = String(ProcessInfo.processInfo.processIdentifier)
@@ -553,7 +571,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Mirror",
-            .applicationVersion: "1.2.0",
+            .applicationVersion: "1.3.0",
             .credits: NSAttributedString(string:
                 "Continuous security-camera recorder.\nSaves rolling clips with audio to your chosen folder.\n\nNote: the green camera light is hardware-controlled and cannot be turned off.",
                 attributes: [.font: NSFont.systemFont(ofSize: 11)]),

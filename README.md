@@ -65,6 +65,7 @@ you):
 | `MIRROR_FPS`             | `30`                        | Frame rate                       |
 | `MIRROR_BITRATE`         | `4000k`                     | Video bitrate                    |
 | `MIRROR_RETENTION_DAYS`  | `3`                         | Days of clips to keep            |
+| `MIRROR_MAX_GB`          | `0`                         | Max folder size in GB (0 = none) |
 
 ## Build from source
 

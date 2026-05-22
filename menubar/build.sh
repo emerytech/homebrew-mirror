@@ -26,8 +26,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleName</key><string>Mirror</string>
     <key>CFBundleDisplayName</key><string>Mirror</string>
     <key>CFBundleIdentifier</key><string>com.temery.mirror.menubar</string>
-    <key>CFBundleVersion</key><string>1.2.0</string>
-    <key>CFBundleShortVersionString</key><string>1.2.0</string>
+    <key>CFBundleVersion</key><string>1.3.0</string>
+    <key>CFBundleShortVersionString</key><string>1.3.0</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleExecutable</key><string>Mirror</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>

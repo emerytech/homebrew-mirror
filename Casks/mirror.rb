@@ -1,6 +1,6 @@
 cask "mirror" do
-  version "1.2.0"
-  sha256 "9bb9e51915cb1d52eb1f88be2f01bcb65008f9ef6fc7676e3c71ffb9df605fe3"
+  version "1.3.0"
+  sha256 "85cdc04a3c9ed1722c6c4e291df256d5feea5b4123385e292618a9690833be07"
 
   url "https://github.com/emerytech/homebrew-mirror/releases/download/v#{version}/Mirror.zip"
   name "Mirror"
