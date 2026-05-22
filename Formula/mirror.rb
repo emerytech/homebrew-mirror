@@ -2,7 +2,7 @@ class Mirror < Formula
   desc "Continuous security-camera recorder for macOS (menu bar app + scripts)"
   homepage "https://github.com/emerytech/homebrew-mirror"
   url "https://github.com/emerytech/homebrew-mirror/archive/refs/tags/v1.1.0.tar.gz"
-  sha256 "REPLACE_WITH_SHA256"
+  sha256 "a293ad90bb7b9d7748a357cbf116391515f08eaa92499001953d26c7bea75e6b"
   license "MIT"
 
   depends_on "ffmpeg"
