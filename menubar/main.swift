@@ -181,6 +181,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                accessibilityDescription: nil)
         menu.addItem(toggle)
 
+        // Hard stop: kills any stray recorder/ffmpeg holding the camera, even
+        // ones this app instance didn't launch (crash leftovers, LaunchAgent).
+        let force = NSMenuItem(title: "Force Stop & Release Camera",
+                               action: #selector(forceStopAll), keyEquivalent: "")
+        force.target = self
+        force.image = NSImage(systemSymbolName: "camera.badge.ellipsis",
+                              accessibilityDescription: nil)
+        menu.addItem(force)
+
         let mirror = NSMenuItem(title: "Show Mirror",
                                 action: #selector(showMirror), keyEquivalent: "m")
         mirror.target = self
@@ -214,6 +223,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         login.target = self
         login.state = loginEnabled() ? .on : .off
         menu.addItem(login)
+
+        // Only relevant when the KeepAlive recorder service is installed.
+        if agentInstalled() {
+            let agent = NSMenuItem(title: "Auto-Record Service",
+                                   action: #selector(toggleAgent), keyEquivalent: "")
+            agent.target = self
+            agent.state = agentLoaded() ? .on : .off
+            agent.toolTip = "Background recorder that auto-starts at login (com.temery.mirror)"
+            menu.addItem(agent)
+        }
 
         menu.addItem(.separator())
 
@@ -345,6 +364,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func stopTicker() { ticker?.invalidate(); ticker = nil; startedAt = nil }
 
+    // Nuke every recorder process that could be holding the camera, including
+    // orphans this app instance didn't launch. Each pattern is matched against
+    // the full command line via `pkill -f`.
+    @objc func forceStopAll() {
+        stop()  // graceful stop for our own tracked process, if any
+        // Boot out the KeepAlive login agent FIRST, otherwise launchd respawns
+        // the recorder the instant we kill it.
+        setAgent(loaded: false)
+        let patterns = [
+            recordScript,             // the supervising record.sh, by full path
+            cfgDir() + "/cam_",       // the ffmpeg encoder, by its output path
+        ]
+        for pat in patterns {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+            p.arguments = ["-TERM", "-f", pat]   // TERM lets ffmpeg finalize the clip
+            try? p.run()
+            p.waitUntilExit()
+        }
+        refreshIcon()
+    }
+
     // MARK: Live mirror preview
     func deviceForConfiguredCamera() -> AVCaptureDevice? {
         var types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
@@ -453,6 +494,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     func humanSize(_ bytes: Int64) -> String {
         let f = ByteCountFormatter(); f.countStyle = .file
         return f.string(fromByteCount: bytes)
+    }
+
+    // MARK: Auto-record LaunchAgent (com.temery.mirror, KeepAlive)
+    // This is the login-time recorder service. Its KeepAlive will respawn the
+    // recorder after any kill, so Force Stop must boot it out, and we expose a
+    // toggle to bring it back.
+    let agentLabel = "com.temery.mirror"
+    var agentPlistPath: String {
+        ("~/Library/LaunchAgents/\(agentLabel).plist" as NSString).expandingTildeInPath
+    }
+    func agentInstalled() -> Bool { FileManager.default.fileExists(atPath: agentPlistPath) }
+    func agentLoaded() -> Bool {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        p.arguments = ["print", "gui/\(getuid())/\(agentLabel)"]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try? p.run(); p.waitUntilExit()
+        return p.terminationStatus == 0
+    }
+    func setAgent(loaded: Bool) {
+        let uid = String(getuid())
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        if loaded {
+            guard agentInstalled() else { return }
+            p.arguments = ["bootstrap", "gui/\(uid)", agentPlistPath]
+        } else {
+            p.arguments = ["bootout", "gui/\(uid)/\(agentLabel)"]
+        }
+        p.standardError = FileHandle.nullDevice
+        try? p.run(); p.waitUntilExit()
+    }
+    @objc func toggleAgent() {
+        setAgent(loaded: !agentLoaded())
+        refreshIcon()
     }
 
     // MARK: Launch at login
