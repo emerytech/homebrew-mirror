@@ -553,7 +553,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Mirror",
-            .applicationVersion: "1.0",
+            .applicationVersion: "1.2.0",
             .credits: NSAttributedString(string:
                 "Continuous security-camera recorder.\nSaves rolling clips with audio to your chosen folder.\n\nNote: the green camera light is hardware-controlled and cannot be turned off.",
                 attributes: [.font: NSFont.systemFont(ofSize: 11)]),
