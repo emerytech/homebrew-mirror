@@ -7,7 +7,6 @@ class Mirror < Formula
 
   depends_on "ffmpeg"
   depends_on :macos
-  depends_on xcode: :build
 
   def install
     # Build Mirror.app (compiles the Swift menu bar app + generates the icon).
